@@ -5,7 +5,7 @@ import pandas as pd
 import time
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
-from datetime import datetime 
+from datetime import datetime, timezone, timedelta
 import os
 import shutil
 import configparser
@@ -36,11 +36,13 @@ soup = BeautifulSoup(response.content, 'html.parser')
 
 
 # Extract the relevant information from the HTML code
-# The date follows this format YYYY0DDHHMM
+# The date follows this format YYYYDDDHHMM
 # Example: 20240171150
-today = datetime.now()
+today = datetime.now(timezone.utc) - timedelta(hours=3)
 
-todays_day = today.strftime("%d")
+# This is neccesary because the above format has DDD because it goes from 000 to 365
+# So you need to calculate the number of the day within the year.
+todays_day = str(datetime.now().timetuple().tm_yday)
 
 todays_hour = today.strftime("%H%M")
 
@@ -51,6 +53,7 @@ for row in soup.find_all('a', href=True):
 
     link_to_img = row['href']
     date_in_tag = link_to_img[:11]
+    
 
     # Conditionals explanation
     # -------------------------
@@ -78,10 +81,11 @@ font = ImageFont.truetype(config['DEFAULT']['Font'], size = int(config['DEFAULT'
 image_list = []
 print("Downloading images . . .")
 img_number = 1
+
 for index, row in df.iterrows():
     url = config['DEFAULT']['UrlGoes16'] + row['Link_to_img']
     
-    response = requests.get(url)
+    response = requests.get(url)    
 
     image = Image.open(BytesIO(response.content))
     imageZoom = image.crop((2801, 4105, 3001, 4305))
@@ -99,7 +103,7 @@ for index, row in df.iterrows():
     del tDraw
 
     draw = ImageDraw.Draw(image680)
-    draw.text((1, 661), row['Date'], fill=(255, 255, 255), font=font)
+    draw.text((1, 661), row['Date'] + " ==> Created at: " + todays_day + todays_hour, fill=(255, 255, 255), font=font)
     draw.line([(430, 430), (430, 679), (679, 679), (679, 430), (430, 430)], (255, 255, 255))
     draw.ellipse([(344, 342), (348, 346)], fill='red')
     draw.ellipse([(564, 550), (576, 562)], outline='red')
@@ -110,6 +114,9 @@ for index, row in df.iterrows():
 
     #Saves image to folder
     image680.save(folder_name + '/' + row['Date'] + ".png")
+
+    if img_number == 1:
+        image680.save('still.png')
 
     print("Image", img_number, ", downloaded succesfully")
     img_number += 1
@@ -124,25 +131,4 @@ image_list[0].save(
             duration=100, # in milliseconds
             loop=0)    
 
-'''
-# TODO: Check why the red dot is not showing correctly.
-# This code does the same but using the images that are already downloaded 
-# this was for checking if the red dot would show in the gif but it didnt 
-# work at first. 
 
-print("Starting gif creation . . .")
-files_list = os.listdir('imgs/2024_01_20_11:41')
-
-imgs_list = []
-
-for f in files_list:
-    frame = Image.open('imgs/2024_01_20_11:41/'+ f)
-    imgs_list.append(frame)
-
-imgs_list[0].save(
-            'satanim.gif',
-            save_all=True,
-            append_images=imgs_list[1:], # append rest of the images
-            duration=100, # in milliseconds
-            loop=0)        
-'''
